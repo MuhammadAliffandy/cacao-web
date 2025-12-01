@@ -1,0 +1,336 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cocoa Doctor AI</title>
+    <style>
+        :root { --primary: #6366f1; --bg: #f8fafc; --text: #1e293b; --danger: #ef4444; }
+        body { font-family: 'Segoe UI', sans-serif; background: var(--bg); color: var(--text); display: flex; flex-direction: column; align-items: center; min-height: 100vh; margin: 0; padding: 20px; }
+        
+        .container { background: white; width: 100%; max-width: 600px; padding: 30px; border-radius: 16px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); margin-bottom: 50px; }
+        h1 { text-align: center; margin-bottom: 5px; color: var(--primary); }
+        p.subtitle { text-align: center; color: #64748b; margin-bottom: 20px; font-size: 0.9em; }
+
+        /* --- TABS --- */
+        .tabs { display: flex; justify-content: space-between; gap: 5px; margin-bottom: 20px; background: #eef2ff; padding: 5px; border-radius: 10px; overflow-x: auto; }
+        .tab-btn { flex: 1; border: none; background: transparent; padding: 10px; cursor: pointer; font-weight: 600; color: #64748b; border-radius: 8px; transition: 0.3s; white-space: nowrap; font-size: 0.9em; }
+        .tab-btn.active { background: white; color: var(--primary); box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
+
+        .section-area { display: none; animation: fadeIn 0.4s; }
+        .section-area.active { display: block; }
+
+        /* --- UPLOAD & CAMERA --- */
+        .upload-box { display: flex; flex-direction: column; align-items: center; justify-content: center; border: 2px dashed #cbd5e1; padding: 40px 20px; text-align: center; border-radius: 12px; cursor: pointer; transition: 0.3s; background-color: #fcfcfc; width: 100%; box-sizing: border-box; }
+        .upload-box:hover { border-color: var(--primary); background: #f0fdf4; }
+        
+        .camera-container { position: relative; width: 100%; min-height: 320px; background: #000; border-radius: 12px; overflow: hidden; display: flex; justify-content: center; align-items: center; }
+        video { position: absolute; width: 100%; height: 100%; object-fit: cover; opacity: 0; pointer-events: none; }
+        #camResult { width: 100%; height: 100%; object-fit: contain; z-index: 2; display: block; }
+
+        /* --- BUTTONS --- */
+        .btn { padding: 12px 24px; border: none; border-radius: 8px; cursor: pointer; font-weight: 600; transition: 0.2s; width: 100%; margin-top: 10px; }
+        .btn-primary { background: var(--primary); color: white; }
+        .btn-danger { background: var(--danger); color: white; width: auto; }
+        .cam-controls { margin-top: 15px; display: flex; gap: 10px; justify-content: center; }
+
+        /* --- RESULTS --- */
+        .result-view img { max-width: 100%; border-radius: 8px; border: 1px solid #e2e8f0; margin-top: 15px; }
+        .stats-box { background: #f1f5f9; padding: 15px; border-radius: 8px; margin-top: 10px; font-size: 0.9em; }
+
+        /* --- HISTORY STYLES --- */
+        .history-item { display: flex; gap: 15px; background: white; border: 1px solid #e2e8f0; padding: 10px; border-radius: 8px; margin-bottom: 10px; align-items: center; }
+        .history-thumb { width: 60px; height: 60px; object-fit: cover; border-radius: 6px; background: #eee; }
+        .history-info { flex: 1; }
+        .history-date { font-size: 0.75em; color: #94a3b8; }
+        .history-label { font-weight: bold; color: var(--text); }
+        .clear-btn { background: #ffe4e6; color: var(--danger); border: none; padding: 8px 15px; border-radius: 6px; cursor: pointer; font-size: 0.85em; width: 100%; margin-bottom: 15px; }
+
+        /* --- DICTIONARY STYLES --- */
+        .dict-card { background: #fff; border-left: 4px solid var(--primary); padding: 15px; margin-bottom: 15px; border-radius: 0 8px 8px 0; box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
+        .dict-title { font-weight: bold; font-size: 1.1em; color: var(--primary); margin-bottom: 5px; }
+        .dict-desc { font-size: 0.9em; color: #475569; line-height: 1.5; }
+
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>🌱 Cocoa Doctor</h1>
+    <p class="subtitle">AI Detection • History • Encyclopedia</p>
+
+    <div class="tabs">
+        <button class="tab-btn active" onclick="switchTab('upload')">📁 Upload</button>
+        <button class="tab-btn" onclick="switchTab('camera')">📷 Live</button>
+        <button class="tab-btn" onclick="switchTab('history')">📜 History</button>
+        <button class="tab-btn" onclick="switchTab('info')">📖 Info</button>
+    </div>
+
+    <div id="uploadSection" class="section-area active">
+        <label for="fileInput" class="upload-box">
+            <span style="font-size: 24px; margin-bottom: 10px;">📂</span>
+            <span id="fileName">Klik untuk pilih gambar</span>
+            <input type="file" id="fileInput" accept="image/*" hidden>
+        </label>
+        <button class="btn btn-primary" onclick="processUpload()">🔍 Analisis Foto</button>
+        
+        <div id="uploadResult" class="result-view" style="display:none;">
+            <img id="uploadedImageResult" src="">
+            <div class="stats-box" id="uploadStats"></div>
+        </div>
+    </div>
+
+    <div id="cameraSection" class="section-area">
+        <div class="camera-container">
+            <video id="webcam" autoplay playsinline muted></video>
+            <img id="camResult" src="https://via.placeholder.com/640x480?text=Kamera+Mati" alt="Camera Feed">
+        </div>
+        <div class="cam-controls">
+            <button class="btn btn-primary" style="width: auto;" onclick="startCamera()">▶ Start</button>
+            <button class="btn btn-danger" onclick="stopCamera()">⏹ Stop</button>
+        </div>
+        <div class="stats-box" id="camStats" style="display:none; margin-top:15px;"></div>
+    </div>
+
+    <div id="historySection" class="section-area">
+        <button class="clear-btn" onclick="clearHistory()">🗑️ Hapus Semua Riwayat</button>
+        <div id="historyList">
+            <p style="text-align:center; color:#94a3b8;">Belum ada riwayat scan.</p>
+        </div>
+    </div>
+
+    <div id="infoSection" class="section-area">
+        <div id="dictionaryList"></div>
+    </div>
+</div>
+
+<canvas id="hiddenCanvas" style="display:none;"></canvas>
+
+<script>
+    // --- KONFIGURASI KAMUS PENYAKIT (Sesuaikan nama class dengan modelmu) ---
+    const diseaseDictionary = {
+        "BLACKPOD": `
+            <b>Nama:</b> Busuk Buah (Black Pod Disease)<br>
+            <b>Penyebab:</b> Jamur <i>Phytophthora palmivora</i>.<br>
+            <b>Gejala:</b> Bercak cokelat kehitaman yang menyebar cepat dari ujung atau pangkal buah. Buah menjadi busuk total dalam beberapa hari.<br>
+            <b>Solusi:</b> Sanitasi kebun, pangkas pohon agar tidak lembab, dan semprot fungisida tembaga.
+        `,
+        "FROSTYROT": `
+            <b>Nama:</b> Busuk Berembun (Frosty Pod Rot)<br>
+            <b>Penyebab:</b> Jamur <i>Moniliophthora roreri</i>.<br>
+            <b>Gejala:</b> Muncul serbuk putih tebal seperti bedak/salju di permukaan buah. Buah terasa berat dan keras.<br>
+            <b>Solusi:</b> Sangat menular! Buah sakit harus segera dibungkus plastik, dipetik, dan dikubur. Jangan dibiarkan di tanah.
+        `,
+        "MIRID": `
+            <b>Nama:</b> Hama Penghisap Buah (Helopeltis/Mirids)<br>
+            <b>Penyebab:</b> Serangga <i>Helopeltis spp.</i><br>
+            <b>Gejala:</b> Kulit buah penuh bercak-bercak hitam (koreng/bopeng). Serangan parah pada buah muda bisa menyebabkan buah kering dan rontok.<br>
+            <b>Solusi:</b> Insektisida nabati/kimia, atau pelihara musuh alami seperti Semut Hitam.
+        `,
+        "HEALTHY": `
+            <b>Nama:</b> Buah Sehat<br>
+            <b>Status:</b> Aman.<br>
+            <b>Keterangan:</b> Buah dalam kondisi prima. Kulit mulus, warna cerah (hijau/merah/kuning tergantung varietas), tidak ada tanda serangan hama atau jamur.<br>
+            <b>Saran:</b> Lakukan perawatan rutin untuk menjaga kondisi ini.
+        `
+    };
+
+    // --- LOGIC UTAMA ---
+    let stream = null;
+    let isProcessing = false;
+    let loopInterval = null;
+    const video = document.getElementById('webcam');
+    const canvas = document.getElementById('hiddenCanvas');
+    const ctx = canvas.getContext('2d');
+
+    // Load Data saat awal buka
+    window.onload = () => {
+        renderDictionary();
+        renderHistory();
+    };
+
+    function switchTab(tabName) {
+        document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+        document.querySelectorAll('.section-area').forEach(sec => sec.classList.remove('active'));
+
+        // Logic tombol aktif
+        const btnIndex = ['upload', 'camera', 'history', 'info'].indexOf(tabName);
+        document.querySelectorAll('.tab-btn')[btnIndex].classList.add('active');
+        document.getElementById(tabName + 'Section').classList.add('active');
+
+        if (tabName !== 'camera') stopCamera();
+        if (tabName === 'history') renderHistory();
+    }
+
+    // --- UPLOAD HANDLER ---
+    const fileInput = document.getElementById('fileInput');
+    fileInput.addEventListener('change', () => {
+        if(fileInput.files[0]) document.getElementById('fileName').innerText = fileInput.files[0].name;
+    });
+
+    async function processUpload() {
+        const file = fileInput.files[0];
+        if (!file) return alert("Pilih gambar dulu!");
+        
+        const formData = new FormData();
+        formData.append('file', file);
+        
+        try {
+            document.querySelector('#uploadSection .btn-primary').innerText = "⏳ Menganalisis...";
+            const res = await fetch('/predict', { method: 'POST', body: formData });
+            const data = await res.json();
+            document.querySelector('#uploadSection .btn-primary').innerText = "🔍 Analisis Foto";
+
+            if (data.error) throw new Error(data.error);
+
+            // Tampilkan UI
+            const imgData = 'data:image/jpeg;base64,' + data.image_data;
+            document.getElementById('uploadedImageResult').src = imgData;
+            document.getElementById('uploadResult').style.display = 'block';
+            renderStats(data.detections, 'uploadStats');
+
+            // SIMPAN KE HISTORY
+            saveToHistory(imgData, data.detections);
+
+        } catch (e) {
+            alert("Error: " + e.message);
+        }
+    }
+
+    // --- CAMERA HANDLER ---
+    async function startCamera() {
+        try {
+            stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+            video.srcObject = stream;
+            video.onloadedmetadata = () => {
+                canvas.width = video.videoWidth;
+                canvas.height = video.videoHeight;
+                loopInterval = setInterval(processFrame, 400); // 400ms biar gak terlalu berat
+                document.getElementById('camStats').style.display = 'block';
+            };
+        } catch (err) { alert("Gagal akses kamera: " + err); }
+    }
+
+    function stopCamera() {
+        if (stream) { stream.getTracks().forEach(t => t.stop()); video.srcObject = null; }
+        clearInterval(loopInterval);
+        document.getElementById('camStats').style.display = 'none';
+        document.getElementById('camResult').src = "https://via.placeholder.com/640x480?text=Kamera+Mati";
+    }
+
+    async function processFrame() {
+        if (isProcessing) return;
+        isProcessing = true;
+        try {
+            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+            canvas.toBlob(async (blob) => {
+                if (!blob) { isProcessing = false; return; }
+                const formData = new FormData();
+                formData.append('file', blob, "frame.jpg");
+                
+                const res = await fetch('/predict', { method: 'POST', body: formData });
+                const data = await res.json();
+
+                if (!data.error) {
+                    document.getElementById('camResult').src = 'data:image/jpeg;base64,' + data.image_data;
+                    renderStats(data.detections, 'camStats');
+                }
+                isProcessing = false;
+            }, 'image/jpeg', 0.5);
+        } catch (e) { isProcessing = false; }
+    }
+
+    function renderStats(detections, elementId) {
+        const el = document.getElementById(elementId);
+        if (!detections || detections.length === 0) {
+            el.innerHTML = "<b style='color:green;'>✅ Aman (Tidak ada deteksi)</b>";
+        } else {
+            let html = "<b>⚠️ Terdeteksi:</b><br>";
+            detections.forEach(d => {
+                html += `<div style="display:flex; justify-content:space-between; margin-top:5px;">
+                            <span>${d.class}</span> 
+                            <span>${Math.round(d.confidence*100)}%</span>
+                         </div>`;
+            });
+            el.innerHTML = html;
+        }
+    }
+
+    // --- FITUR HISTORY (LOCAL STORAGE) ---
+    function saveToHistory(imageBase64, detections) {
+        // Ambil data lama
+        let history = JSON.parse(localStorage.getItem('cocoaHistory')) || [];
+        
+        // Buat ringkasan hasil
+        let labelSummary = detections.length > 0 ? detections[0].class : "Healthy";
+        if (detections.length > 1) labelSummary += ` (+${detections.length - 1} lainnya)`;
+
+        const newItem = {
+            id: Date.now(),
+            date: new Date().toLocaleString(),
+            image: imageBase64, // Simpan gambar kecil
+            result: labelSummary
+        };
+
+        // Simpan di awal array (Unshift) & Batasi cuma 10 item terakhir biar browser gak berat
+        history.unshift(newItem);
+        if (history.length > 10) history.pop();
+
+        localStorage.setItem('cocoaHistory', JSON.stringify(history));
+    }
+
+    function renderHistory() {
+        const list = document.getElementById('historyList');
+        const history = JSON.parse(localStorage.getItem('cocoaHistory')) || [];
+        
+        if (history.length === 0) {
+            list.innerHTML = "<p style='text-align:center; color:#94a3b8; margin-top:20px;'>Belum ada riwayat scan.</p>";
+            return;
+        }
+
+        let html = "";
+        history.forEach(item => {
+            html += `
+                <div class="history-item">
+                    <img src="${item.image}" class="history-thumb">
+                    <div class="history-info">
+                        <div class="history-label">${item.result}</div>
+                        <div class="history-date">${item.date}</div>
+                    </div>
+                </div>
+            `;
+        });
+        list.innerHTML = html;
+    }
+
+    function clearHistory() {
+        if(confirm("Hapus semua riwayat?")) {
+            localStorage.removeItem('cocoaHistory');
+            renderHistory();
+        }
+    }
+
+    // --- FITUR DICTIONARY / INFO ---
+    function renderDictionary() {
+        const container = document.getElementById('dictionaryList');
+        let html = "";
+        
+        // Loop object kamus
+        for (const [name, desc] of Object.entries(diseaseDictionary)) {
+            html += `
+                <div class="dict-card">
+                    <div class="dict-title">${name}</div>
+                    <div class="dict-desc">${desc}</div>
+                </div>
+            `;
+        }
+        
+        // Tambahkan info default jika kosong
+        if (html === "") html = "<p>Data kamus belum diisi di kode.</p>";
+        container.innerHTML = html;
+    }
+</script>
+
+</body>
+</html>
