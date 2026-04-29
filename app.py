@@ -95,11 +95,19 @@ def predict():
         # 1. Ambil gambar hasil plot (kotak-kotak deteksi)
         res_plotted = results[0].plot()
         
-        # 2. Convert warna BGR (OpenCV) ke RGB (Web)
+        # 2. Resize gambar agar base64 tidak terlalu besar (mencegah lag / memori penuh)
+        max_dim = 1280
+        h, w = res_plotted.shape[:2]
+        if max(h, w) > max_dim:
+            scale = max_dim / max(h, w)
+            res_plotted = cv2.resize(res_plotted, (int(w * scale), int(h * scale)))
+
+        # 3. Convert warna BGR (OpenCV) ke RGB (Web)
         res_rgb = cv2.cvtColor(res_plotted, cv2.COLOR_BGR2RGB)
         
-        # 3. Encode ke string base64 buat dikirim ke HTML
-        _, buffer = cv2.imencode(".jpg", cv2.cvtColor(res_rgb, cv2.COLOR_RGB2BGR))
+        # 4. Encode ke string base64 dengan kompresi JPEG
+        encode_param = [int(cv2.IMWRITE_JPEG_QUALITY), 80]
+        _, buffer = cv2.imencode(".jpg", cv2.cvtColor(res_rgb, cv2.COLOR_RGB2BGR), encode_param)
         encoded_img = base64.b64encode(buffer).decode('utf-8')
 
         # 4. Ambil data teks (Label & Confidence)

@@ -190,8 +190,33 @@
             document.getElementById('uploadResult').style.display = 'block';
             renderStats(data.detections, 'uploadStats');
 
-            // SIMPAN KE HISTORY
-            saveToHistory(imgData, data.detections);
+            // SIMPAN KE HISTORY (Buat thumbnail dulu agar tidak "Quota Exceeded")
+            const img = new Image();
+            img.onload = () => {
+                const canvas = document.createElement('canvas');
+                const MAX_WIDTH = 200; // Ukuran kecil untuk thumbnail history
+                const scale = Math.min(MAX_WIDTH / img.width, 1); 
+                canvas.width = img.width * scale;
+                canvas.height = img.height * scale;
+                
+                const ctx = canvas.getContext('2d');
+                ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+                const thumbBase64 = canvas.toDataURL('image/jpeg', 0.6); // Kompres kualitas
+                
+                try {
+                    saveToHistory(thumbBase64, data.detections);
+                } catch (err) {
+                    if (err.name === 'QuotaExceededError') {
+                        // Jika masih error karena data lama yang telanjur besar, reset history
+                        localStorage.removeItem('cocoaHistory');
+                        saveToHistory(thumbBase64, data.detections);
+                        if (document.getElementById('historySection').classList.contains('active')) {
+                            renderHistory();
+                        }
+                    }
+                }
+            };
+            img.src = imgData;
 
         } catch (e) {
             alert("Error: " + e.message);
